@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Câmara com federação unificada</title>
+<style>
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --pt:#e34948; --psol:#4a3aa7; --outros:#c3c2b7; --up:#006300; --down:#b42f2f;
+  --hl:#f3f1ea;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+    --pt:#e66767; --psol:#9085e9; --outros:#4a4a47; --up:#0ca30c; --down:#e66767;
+    --hl:#242422;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --pt:#e66767; --psol:#9085e9; --outros:#4a4a47; --up:#0ca30c; --down:#e66767;
+  --hl:#242422;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:28px;line-height:1.2;margin:0 0 6px;font-weight:650;letter-spacing:-.01em}
+h2{font-size:17px;margin:0 0 4px;font-weight:620}
+.sub{color:var(--ink2);margin:0 0 20px;max-width:820px}
+.note{color:var(--muted);font-size:13px}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 20px}
+.seg{display:inline-flex;border:1px solid var(--ring);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;color:var(--ink2);padding:7px 14px;font:inherit;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--page);font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--psol);outline-offset:-2px}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:18px 18px 16px;margin-bottom:16px;min-width:0}
+.grid{display:grid;gap:16px}
+.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.kpi .lab{color:var(--ink2);font-size:13px}
+.kpi .val{font-size:34px;font-weight:650;line-height:1.15;margin:4px 0 2px}
+.kpi .det{color:var(--muted);font-size:13px}
+.up{color:var(--up)} .down{color:var(--down)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin:6px 0 4px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.legend i.ringed{background:transparent!important;box-shadow:inset 0 0 0 2.5px var(--ink)}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.hemi-tot{font-size:13px;color:var(--ink2);text-align:center;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--axis);padding:6px 8px;white-space:nowrap}
+td{border-bottom:1px solid var(--grid);padding:6px 8px;vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.chg td{background:var(--hl)}
+.scroll{overflow-x:auto}
+.pill{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);
+  border-radius:8px;padding:7px 10px;font-size:12.5px;box-shadow:0 4px 18px rgba(0,0,0,.12);opacity:0;transition:opacity .08s;z-index:9;max-width:260px}
+details summary{cursor:pointer;color:var(--ink2);font-size:13.5px;margin-top:8px}
+.method p,.method li{color:var(--ink2);font-size:14px}
+.method h3{font-size:14.5px;margin:16px 0 4px}
+.tag{font-size:11.5px;color:var(--muted);border:1px solid var(--ring);border-radius:6px;padding:0 5px;margin-left:4px;white-space:nowrap}
+@media (max-width:860px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
+@media (max-width:420px){.kpi .val{font-size:28px}h1{font-size:23px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>E se PT/PCdoB/PV e PSOL/Rede fossem uma só federação?</h1>
+  <p class="sub">Simulação da Câmara dos Deputados com as duas federações disputando como uma lista única,
+    a partir dos votos oficiais do TSE. O motor de cálculo reproduz exatamente os 513 eleitos reais antes de
+    aplicar o cenário.
+    <a href="simulador.html" style="color:var(--ink)">Monte outras federações no simulador →</a></p>
+
+  <div class="filters" role="group" aria-label="Eleição">
+    <span class="note">Eleição:</span>
+    <div class="seg" id="anos"></div>
+    <span class="note" id="nota-ano"></span>
+  </div>
+
+  <div class="grid kpis" id="kpis"></div>
+
+  <div class="grid two">
+    <div class="card"><h2>Câmara real</h2><div class="note" id="hemi-a-sub"></div>
+      <div id="hemi-a"></div></div>
+    <div class="card"><h2>Câmara com federação unificada</h2><div class="note" id="hemi-b-sub"></div>
+      <div id="hemi-b"></div></div>
+  </div>
+  <div class="legend" style="margin:-6px 0 18px">
+    <span><i style="background:var(--pt)"></i>PT · PCdoB · PV</span>
+    <span><i style="background:var(--psol)"></i>PSOL · Rede</span>
+    <span><i style="background:var(--outros)"></i>Demais partidos</span>
+    <span><i class="ringed"></i>Cadeira que muda de mãos no cenário</span>
+  </div>
+
+  <div class="grid two">
+    <div class="card"><h2>Quem ganha e quem perde</h2>
+      <div class="note">Saldo de cadeiras por partido (cenário − real)</div>
+      <div id="saldo"></div>
+      <details><summary>Composição completa por partido</summary><div class="scroll" id="tab-partidos"></div></details>
+    </div>
+    <div class="card"><h2>Quanto voto a lista unificada pode perder?</h2>
+      <div class="note">Cadeiras da federação unificada se ela retiver só parte dos votos somados das duas</div>
+      <div id="sens"></div>
+      <div class="note" id="sens-nota"></div>
+    </div>
+  </div>
+
+  <div class="card"><h2>Por estado</h2>
+    <div class="note">Linhas destacadas: UFs onde o cenário muda algum eleito. Votos em múltiplos do quociente eleitoral (QE).</div>
+    <div class="scroll" id="tab-ufs"></div>
+  </div>
+
+  <div class="grid two">
+    <div class="card"><h2>Entram</h2><div class="note">Eleitos no cenário que não foram eleitos de fato</div><div class="scroll" id="entram"></div></div>
+    <div class="card"><h2>Saem</h2><div class="note">Eleitos de fato que ficariam de fora</div><div class="scroll" id="saem"></div></div>
+  </div>
+
+  <div class="card method">
+    <h2>Como foi feito</h2>
+    <h3>Dados</h3>
+    <ul>
+      <li><b>2026</b>: arquivos oficiais de divulgação do TSE por UF (resultados.tse.jus.br, eleição 6259, cargo 6 – deputado federal), com votos nominais, de legenda e situação de cada candidato. Resultado de 04/10/2026, ainda sujeito a retotalização e a julgamentos de candidaturas <i>sub judice</i>.</li>
+      <li><b>2022</b>: Portal de Dados Abertos do TSE (votação por candidato, por partido e detalhe por município/zona).
+        O arquivo <code>votacao_partido_munzona_2022</code> publicado em 07/10/2026 traz todos os valores em dobro;
+        os votos nominais foram tirados do arquivo de candidatos e a legenda dividida por 2 — a soma fecha exatamente com os votos válidos oficiais nas 27 UFs.</li>
+    </ul>
+    <h3>Regras aplicadas (Código Eleitoral, após a Lei 14.211/2021)</h3>
+    <ul>
+      <li>Quociente eleitoral = votos válidos ÷ vagas (fração ≤ 0,5 desprezada). Quociente partidário = votos da legenda ÷ QE.</li>
+      <li>Cadeiras do QP vão a candidatos com pelo menos 10% do QE.</li>
+      <li>Sobras por maiores médias entre legendas com ≥ 80% do QE e candidato com ≥ 20% do QE; esgotadas, a última fase é aberta a todas as legendas (entendimento do STF nas ADIs 7228, 7263 e 7325).</li>
+      <li>Federação conta como um único partido; dentro da lista, as cadeiras seguem a ordem de votação nominal.</li>
+    </ul>
+    <h3>Validação</h3>
+    <p>Antes do cenário, o mesmo código recalcula a eleição real: <b>513 de 513 eleitos idênticos</b> em 2026 e em 2022 (o QE calculado é igual ao divulgado pelo TSE em todas as UFs de 2026). Em 2022, a base oficial atual já incorpora a retotalização das sobras determinada pelo STF.</p>
+    <h3>Hipóteses e limites</h3>
+    <ul>
+      <li><b>Votos estáticos.</b> Cada eleitor vota exatamente como votou. Na prática, uma lista unificada muda candidaturas, alianças estaduais e o comportamento de parte do eleitorado — o gráfico de retenção mostra o quanto de perda o ganho aguenta.</li>
+      <li><b>Teto de candidaturas.</b> Uma federação só registra vagas + 1 candidatos; a lista unificada teria que cortar nomes. A cota pessimista (votos nominais dos cortados simplesmente perdidos) aparece no indicador “lista limitada”.</li>
+      <li>Votos “anulados sub judice” não contam, como na totalização oficial. Em 2026 isso inclui toda a lista do PSOL/Rede em Sergipe.</li>
+      <li>O exercício olha só a Câmara; não modela efeitos sobre cláusula de barreira, fundo partidário ou tempo de TV.</li>
+    </ul>
+    <p class="note">Código: <code>carga.py</code> (leitura), <code>alocacao.py</code> (distribuição de cadeiras), <code>cenario.py</code> (simulação e validação), <code>build_dashboard.py</code> (este painel).</p>
+  </div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const DADOS = {"2026": {"ano": 2026, "total_vagas": 513, "base_federacoes": {"pt": 88, "psol": 15}, "cenario_fusao": 108, "partidos": [{"partido": "PL", "base": 121, "cenario": 121}, {"partido": "PT", "base": 70, "cenario": 74}, {"partido": "UNIÃO", "base": 46, "cenario": 45}, {"partido": "PSD", "base": 43, "cenario": 41}, {"partido": "PP", "base": 41, "cenario": 41}, {"partido": "REPUBLICANOS", "base": 41, "cenario": 40}, {"partido": "MDB", "base": 36, "cenario": 35}, {"partido": "PODE", "base": 27, "cenario": 27}, {"partido": "PSB", "base": 15, "cenario": 15}, {"partido": "PSOL", "base": 14, "cenario": 15}, {"partido": "PCdoB", "base": 11, "cenario": 11}, {"partido": "PSDB", "base": 11, "cenario": 11}, {"partido": "NOVO", "base": 10, "cenario": 10}, {"partido": "PV", "base": 7, "cenario": 7}, {"partido": "PDT", "base": 6, "cenario": 6}, {"partido": "AVANTE", "base": 5, "cenario": 5}, {"partido": "PRD", "base": 5, "cenario": 5}, {"partido": "SOLIDARIEDADE", "base": 2, "cenario": 2}, {"partido": "MISSÃO", "base": 1, "cenario": 1}, {"partido": "REDE", "base": 1, "cenario": 1}], "ufs": [{"uf": "AC", "vagas": 8, "vv": 462485, "qe": 57811, "votos_pt": 46510, "votos_psol": 428, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "AL", "vagas": 9, "vv": 1798341, "qe": 199816, "votos_pt": 97904, "votos_psol": 0, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "AM", "vagas": 8, "vv": 2119252, "qe": 264906, "votos_pt": 95690, "votos_psol": 13342, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "AP", "vagas": 8, "vv": 459680, "qe": 57460, "votos_pt": 69825, "votos_psol": 2944, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "BA", "vagas": 39, "vv": 8281816, "qe": 212354, "votos_pt": 1960126, "votos_psol": 87171, "cad_pt": 10, "cad_psol": 0, "cad_fusao": 10, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "CE", "vagas": 22, "vv": 5521642, "qe": 250984, "votos_pt": 715266, "votos_psol": 191448, "cad_pt": 3, "cad_psol": 0, "cad_fusao": 4, "psol_80": false, "pt_80": true, "delta_partido": {"PSOL": 1, "PSD": -1}, "mecanismo": "Os votos do PSOL/Rede (76% do QE) ficavam fora das sobras; somados à FE Brasil, viram cadeira."}, {"uf": "DF", "vagas": 8, "vv": 1659057, "qe": 207382, "votos_pt": 237155, "votos_psol": 239437, "cad_pt": 2, "cad_psol": 1, "cad_fusao": 3, "psol_80": true, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "ES", "vagas": 10, "vv": 2134985, "qe": 213498, "votos_pt": 315939, "votos_psol": 31839, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "GO", "vagas": 17, "vv": 3607744, "qe": 212220, "votos_pt": 379055, "votos_psol": 10030, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MA", "vagas": 18, "vv": 3970967, "qe": 220609, "votos_pt": 303233, "votos_psol": 10671, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MG", "vagas": 53, "vv": 11380151, "qe": 214720, "votos_pt": 2359317, "votos_psol": 434701, "cad_pt": 13, "cad_psol": 2, "cad_fusao": 15, "psol_80": true, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MS", "vagas": 8, "vv": 1420762, "qe": 177595, "votos_pt": 249377, "votos_psol": 5019, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MT", "vagas": 8, "vv": 1901719, "qe": 237715, "votos_pt": 235286, "votos_psol": 3535, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PA", "vagas": 17, "vv": 4832237, "qe": 284249, "votos_pt": 488909, "votos_psol": 95756, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PB", "vagas": 12, "vv": 2399949, "qe": 199996, "votos_pt": 379032, "votos_psol": 11661, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PE", "vagas": 25, "vv": 5264503, "qe": 210580, "votos_pt": 717053, "votos_psol": 264739, "cad_pt": 4, "cad_psol": 1, "cad_fusao": 5, "psol_80": true, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PI", "vagas": 10, "vv": 2109063, "qe": 210906, "votos_pt": 787449, "votos_psol": 7531, "cad_pt": 4, "cad_psol": 0, "cad_fusao": 4, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PR", "vagas": 30, "vv": 6217229, "qe": 207241, "votos_pt": 1065382, "votos_psol": 15417, "cad_pt": 6, "cad_psol": 0, "cad_fusao": 6, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "RJ", "vagas": 46, "vv": 8743753, "qe": 190082, "votos_pt": 1361042, "votos_psol": 656318, "cad_pt": 8, "cad_psol": 4, "cad_fusao": 12, "psol_80": true, "pt_80": true, "delta_partido": {"PT": -1, "PSOL": 1}, "mecanismo": "Sem ganho líquido: muda só quem ocupa a cadeira dentro da lista unificada."}, {"uf": "RN", "vagas": 8, "vv": 1967700, "qe": 245962, "votos_pt": 635790, "votos_psol": 1645, "cad_pt": 3, "cad_psol": 0, "cad_fusao": 3, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "RO", "vagas": 8, "vv": 932939, "qe": 116617, "votos_pt": 74200, "votos_psol": 1769, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "RR", "vagas": 8, "vv": 318821, "qe": 39853, "votos_pt": 16620, "votos_psol": 368, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "RS", "vagas": 31, "vv": 6081271, "qe": 196170, "votos_pt": 1063436, "votos_psol": 368811, "cad_pt": 6, "cad_psol": 1, "cad_fusao": 9, "psol_80": true, "pt_80": true, "delta_partido": {"MDB": -1, "PT": 2, "UNIÃO": -1}, "mecanismo": "As sobras das duas listas, somadas, superam a maior média de outra legenda."}, {"uf": "SC", "vagas": 16, "vv": 4231498, "qe": 264469, "votos_pt": 691958, "votos_psol": 42165, "cad_pt": 3, "cad_psol": 0, "cad_fusao": 3, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "SE", "vagas": 8, "vv": 1283700, "qe": 160462, "votos_pt": 173171, "votos_psol": 0, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "SP", "vagas": 70, "vv": 23674188, "qe": 338203, "votos_pt": 2843542, "votos_psol": 3060751, "cad_pt": 11, "cad_psol": 6, "cad_fusao": 19, "psol_80": true, "pt_80": true, "delta_partido": {"PT": 3, "REPUBLICANOS": -1, "PSOL": -1, "PSD": -1}, "mecanismo": "As sobras das duas listas, somadas, superam a maior média de outra legenda."}, {"uf": "TO", "vagas": 8, "vv": 902567, "qe": 112821, "votos_pt": 57639, "votos_psol": 1745, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}], "entram": [{"uf": "CE", "nome": "RENATO ROSENO", "partido": "PSOL", "votos": 116905, "fase": "QP"}, {"uf": "RJ", "nome": "TARCÍSIO MOTTA", "partido": "PSOL", "votos": 69407, "fase": "media"}, {"uf": "RS", "nome": "ALEXANDRE LINDENMEYER", "partido": "PT", "votos": 89434, "fase": "media"}, {"uf": "RS", "nome": "LAURA SITO", "partido": "PT", "votos": 79335, "fase": "media"}, {"uf": "SP", "nome": "RUI FALCÃO", "partido": "PT", "votos": 106443, "fase": "QP"}, {"uf": "SP", "nome": "PAULO TEIXEIRA", "partido": "PT", "votos": 106062, "fase": "media"}, {"uf": "SP", "nome": "REIS", "partido": "PT", "votos": 90224, "fase": "media"}], "saem": [{"uf": "CE", "nome": "CÉLIO STUDART", "partido": "PSD", "votos": 122415, "fase": "media"}, {"uf": "RJ", "nome": "NÍSIA TRINDADE", "partido": "PT", "votos": 67350, "fase": "media"}, {"uf": "RS", "nome": "BUSATO", "partido": "UNIÃO", "votos": 60127, "fase": "media"}, {"uf": "RS", "nome": "VILMAR ZANCHIN", "partido": "MDB", "votos": 40406, "fase": "media"}, {"uf": "SP", "nome": "MARIA ROSAS", "partido": "REPUBLICANOS", "votos": 91690, "fase": "media"}, {"uf": "SP", "nome": "CARLOS BEZERRA JR.", "partido": "PSD", "votos": 89414, "fase": "media"}, {"uf": "SP", "nome": "SÔNIA GUAJAJARA", "partido": "PSOL", "votos": 54207, "fase": "QP"}], "sensibilidade": [{"retencao": 100, "cadeiras": 108}, {"retencao": 99, "cadeiras": 108}, {"retencao": 98, "cadeiras": 106}, {"retencao": 97, "cadeiras": 106}, {"retencao": 96, "cadeiras": 105}, {"retencao": 95, "cadeiras": 104}, {"retencao": 94, "cadeiras": 103}, {"retencao": 93, "cadeiras": 102}, {"retencao": 92, "cadeiras": 102}, {"retencao": 91, "cadeiras": 102}, {"retencao": 90, "cadeiras": 101}, {"retencao": 89, "cadeiras": 100}, {"retencao": 88, "cadeiras": 97}, {"retencao": 87, "cadeiras": 97}, {"retencao": 86, "cadeiras": 95}, {"retencao": 85, "cadeiras": 95}, {"retencao": 84, "cadeiras": 94}, {"retencao": 83, "cadeiras": 91}, {"retencao": 82, "cadeiras": 90}, {"retencao": 81, "cadeiras": 90}, {"retencao": 80, "cadeiras": 89}], "lista_limitada": {"cadeiras": 108, "votos_cortados": 143798, "votos_fusao": 22979147}, "por_partido_lim": {"PP": 41, "UNIÃO": 45, "PL": 121, "REPUBLICANOS": 40, "MDB": 35, "PCdoB": 11, "PSD": 41, "PSDB": 11, "PDT": 6, "PODE": 27, "AVANTE": 5, "PSB": 15, "PT": 74, "PRD": 5, "PSOL": 15, "SOLIDARIEDADE": 2, "PV": 7, "REDE": 1, "NOVO": 10, "MISSÃO": 1}}, "2022": {"ano": 2022, "total_vagas": 513, "base_federacoes": {"pt": 82, "psol": 15}, "cenario_fusao": 104, "partidos": [{"partido": "PL", "base": 98, "cenario": 96}, {"partido": "PT", "base": 69, "cenario": 71}, {"partido": "UNIÃO", "base": 57, "cenario": 57}, {"partido": "PP", "base": 47, "cenario": 47}, {"partido": "PSD", "base": 42, "cenario": 42}, {"partido": "MDB", "base": 41, "cenario": 40}, {"partido": "REPUBLICANOS", "base": 40, "cenario": 40}, {"partido": "PDT", "base": 16, "cenario": 16}, {"partido": "PSB", "base": 15, "cenario": 14}, {"partido": "PODE", "base": 14, "cenario": 12}, {"partido": "PSDB", "base": 13, "cenario": 13}, {"partido": "PSOL", "base": 13, "cenario": 15}, {"partido": "AVANTE", "base": 7, "cenario": 7}, {"partido": "PCdoB", "base": 7, "cenario": 9}, {"partido": "PSC", "base": 6, "cenario": 5}, {"partido": "PV", "base": 6, "cenario": 7}, {"partido": "CIDADANIA", "base": 5, "cenario": 5}, {"partido": "PATRIOTA", "base": 4, "cenario": 4}, {"partido": "SOLIDARIEDADE", "base": 4, "cenario": 4}, {"partido": "NOVO", "base": 3, "cenario": 3}, {"partido": "PROS", "base": 3, "cenario": 3}, {"partido": "REDE", "base": 2, "cenario": 2}, {"partido": "PTB", "base": 1, "cenario": 1}], "ufs": [{"uf": "AC", "vagas": 8, "vv": 434253, "qe": 54282, "votos_pt": 38046, "votos_psol": 3921, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "AL", "vagas": 9, "vv": 1650763, "qe": 183418, "votos_pt": 234310, "votos_psol": 4896, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "AM", "vagas": 8, "vv": 1976477, "qe": 247060, "votos_pt": 154862, "votos_psol": 30560, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "AP", "vagas": 8, "vv": 404749, "qe": 50594, "votos_pt": 36416, "votos_psol": 36225, "cad_pt": 1, "cad_psol": 1, "cad_fusao": 2, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "BA", "vagas": 39, "vv": 7958431, "qe": 204062, "votos_pt": 1761003, "votos_psol": 57660, "cad_pt": 10, "cad_psol": 0, "cad_fusao": 10, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "CE", "vagas": 22, "vv": 5034972, "qe": 228862, "votos_pt": 619292, "votos_psol": 129432, "cad_pt": 3, "cad_psol": 0, "cad_fusao": 4, "psol_80": false, "pt_80": true, "delta_partido": {"PCdoB": 1, "PL": -1}, "mecanismo": "Os votos do PSOL/Rede (57% do QE) ficavam fora das sobras; somados à FE Brasil, viram cadeira."}, {"uf": "DF", "vagas": 8, "vv": 1607519, "qe": 200940, "votos_pt": 291004, "votos_psol": 52089, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "ES", "vagas": 10, "vv": 2084430, "qe": 208443, "votos_pt": 217787, "votos_psol": 35536, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "GO", "vagas": 17, "vv": 3439644, "qe": 202332, "votos_pt": 292767, "votos_psol": 9439, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MA", "vagas": 18, "vv": 3707930, "qe": 205996, "votos_pt": 407352, "votos_psol": 7410, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MG", "vagas": 53, "vv": 11181098, "qe": 210964, "votos_pt": 1787525, "votos_psol": 312260, "cad_pt": 10, "cad_psol": 1, "cad_fusao": 12, "psol_80": true, "pt_80": true, "delta_partido": {"PODE": -1, "PV": 1}, "mecanismo": "As sobras das duas listas, somadas, superam a maior média de outra legenda."}, {"uf": "MS", "vagas": 8, "vv": 1353024, "qe": 169128, "votos_pt": 205316, "votos_psol": 7171, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "MT", "vagas": 8, "vv": 1730277, "qe": 216285, "votos_pt": 159866, "votos_psol": 20794, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": false, "delta_partido": {"PL": -1, "PT": 1}, "mecanismo": "Nenhuma das duas chegava a 80% do QE (FE Brasil 74%, PSOL/Rede 10%); juntas (84%) passam a disputar as sobras."}, {"uf": "PA", "vagas": 17, "vv": 4521516, "qe": 265972, "votos_pt": 381210, "votos_psol": 156463, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 3, "psol_80": false, "pt_80": true, "delta_partido": {"MDB": -1, "PSOL": 1}, "mecanismo": "Os votos do PSOL/Rede (59% do QE) ficavam fora das sobras; somados à FE Brasil, viram cadeira."}, {"uf": "PB", "vagas": 12, "vv": 2209355, "qe": 184113, "votos_pt": 194362, "votos_psol": 18325, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PE", "vagas": 25, "vv": 4969863, "qe": 198795, "votos_pt": 535934, "votos_psol": 266874, "cad_pt": 3, "cad_psol": 1, "cad_fusao": 5, "psol_80": true, "pt_80": true, "delta_partido": {"PSB": -1, "PSOL": 1}, "mecanismo": "As sobras das duas listas, somadas, superam a maior média de outra legenda."}, {"uf": "PI", "vagas": 10, "vv": 1957483, "qe": 195748, "votos_pt": 749076, "votos_psol": 7266, "cad_pt": 5, "cad_psol": 0, "cad_fusao": 5, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "PR", "vagas": 30, "vv": 6038642, "qe": 201288, "votos_pt": 973352, "votos_psol": 42841, "cad_pt": 6, "cad_psol": 0, "cad_fusao": 6, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "RJ", "vagas": 46, "vv": 8575988, "qe": 186435, "votos_pt": 889560, "votos_psol": 738331, "cad_pt": 6, "cad_psol": 5, "cad_fusao": 11, "psol_80": true, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "RN", "vagas": 8, "vv": 1864825, "qe": 233103, "votos_pt": 316707, "votos_psol": 0, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "RO", "vagas": 8, "vv": 869148, "qe": 108643, "votos_pt": 46649, "votos_psol": 950, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "RR", "vagas": 8, "vv": 291714, "qe": 36464, "votos_pt": 3092, "votos_psol": 13741, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 0, "psol_80": false, "pt_80": false, "delta_partido": {}, "mecanismo": ""}, {"uf": "RS", "vagas": 31, "vv": 6149822, "qe": 198381, "votos_pt": 1168128, "votos_psol": 303180, "cad_pt": 7, "cad_psol": 1, "cad_fusao": 8, "psol_80": true, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "SC", "vagas": 16, "vv": 3969848, "qe": 248115, "votos_pt": 524433, "votos_psol": 62820, "cad_pt": 2, "cad_psol": 0, "cad_fusao": 2, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "SE", "vagas": 8, "vv": 1191617, "qe": 148952, "votos_pt": 155309, "votos_psol": 25023, "cad_pt": 1, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": true, "delta_partido": {}, "mecanismo": ""}, {"uf": "SP", "vagas": 70, "vv": 23302342, "qe": 332891, "votos_pt": 3132607, "votos_psol": 2288861, "cad_pt": 11, "cad_psol": 6, "cad_fusao": 18, "psol_80": true, "pt_80": true, "delta_partido": {"PSC": -1, "PCdoB": 1}, "mecanismo": "As sobras das duas listas, somadas, superam a maior média de outra legenda."}, {"uf": "TO", "vagas": 8, "vv": 830140, "qe": 103767, "votos_pt": 70023, "votos_psol": 3095, "cad_pt": 0, "cad_psol": 0, "cad_fusao": 1, "psol_80": false, "pt_80": false, "delta_partido": {"PODE": -1, "PT": 1}, "mecanismo": "Nenhuma das duas chegava a 80% do QE (FE Brasil 67%, PSOL/Rede 3%); juntas (70%) passam a disputar as sobras."}], "entram": [{"uf": "CE", "nome": "INÁCIO ARRUDA", "partido": "PCdoB", "votos": 47672, "fase": "media"}, {"uf": "MG", "nome": "GLAYCON FRANCO", "partido": "PV", "votos": 59818, "fase": "media"}, {"uf": "MT", "nome": "PROFESSORA ROSA NEIDE", "partido": "PT", "votos": 124671, "fase": "media"}, {"uf": "PA", "nome": "VIVI REIS", "partido": "PSOL", "votos": 53353, "fase": "media"}, {"uf": "PE", "nome": "ROBEYONCÉ", "partido": "PSOL", "votos": 80732, "fase": "QP"}, {"uf": "SP", "nome": "ORLANDO SILVA", "partido": "PCdoB", "votos": 108059, "fase": "media"}, {"uf": "TO", "nome": "CÉLIO MOURA", "partido": "PT", "votos": 36186, "fase": "media3"}], "saem": [{"uf": "CE", "nome": "PRISCILA COSTA", "partido": "PL", "votos": 74773, "fase": "media"}, {"uf": "MG", "nome": "NELY AQUINO", "partido": "PODE", "votos": 66866, "fase": "media"}, {"uf": "MT", "nome": "CORONEL FERNANDA", "partido": "PL", "votos": 60304, "fase": "media"}, {"uf": "PA", "nome": "HENDERSON PINTO", "partido": "MDB", "votos": 74746, "fase": "media"}, {"uf": "PE", "nome": "FELIPE  CARRERAS", "partido": "PSB", "votos": 76528, "fase": "media"}, {"uf": "SP", "nome": "GILBERTO NASCIMENTO", "partido": "PSC", "votos": 95077, "fase": "media"}, {"uf": "TO", "nome": "TIAGO DIMAS", "partido": "PODE", "votos": 42970, "fase": "media3"}], "sensibilidade": [{"retencao": 100, "cadeiras": 104}, {"retencao": 99, "cadeiras": 102}, {"retencao": 98, "cadeiras": 101}, {"retencao": 97, "cadeiras": 100}, {"retencao": 96, "cadeiras": 98}, {"retencao": 95, "cadeiras": 96}, {"retencao": 94, "cadeiras": 96}, {"retencao": 93, "cadeiras": 96}, {"retencao": 92, "cadeiras": 96}, {"retencao": 91, "cadeiras": 96}, {"retencao": 90, "cadeiras": 94}, {"retencao": 89, "cadeiras": 93}, {"retencao": 88, "cadeiras": 90}, {"retencao": 87, "cadeiras": 89}, {"retencao": 86, "cadeiras": 88}, {"retencao": 85, "cadeiras": 88}, {"retencao": 84, "cadeiras": 87}, {"retencao": 83, "cadeiras": 87}, {"retencao": 82, "cadeiras": 87}, {"retencao": 81, "cadeiras": 87}, {"retencao": 80, "cadeiras": 86}], "lista_limitada": {"cadeiras": 103, "votos_cortados": 348670, "votos_fusao": 19981151}, "por_partido_lim": {"PP": 47, "REPUBLICANOS": 40, "UNIÃO": 57, "MDB": 40, "PV": 7, "PT": 70, "PSD": 42, "CIDADANIA": 5, "PL": 96, "PDT": 16, "PCdoB": 9, "PSOL": 15, "AVANTE": 7, "PSDB": 13, "PSB": 14, "PODE": 13, "PSC": 5, "PATRIOTA": 4, "PROS": 3, "SOLIDARIEDADE": 4, "REDE": 2, "PTB": 1, "NOVO": 3}}};
+const PT = new Set(["PT","PCdoB","PV"]), PSOL = new Set(["PSOL","REDE"]);
+const grupo = p => PT.has(p) ? "pt" : PSOL.has(p) ? "psol" : "outros";
+const cor = g => `var(--${g})`;
+const fmt = n => n.toLocaleString("pt-BR");
+const sinal = n => n > 0 ? "+" + n : n < 0 ? "−" + Math.abs(n) : "0";
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const tip = document.getElementById("tip");
+function showTip(html, ev){ tip.innerHTML = html; tip.style.opacity = 1;
+  const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + "px"; tip.style.top = (ev.clientY + 14) + "px"; }
+function hideTip(){ tip.style.opacity = 0; }
+
+let ano = "2026";
+try { const s = localStorage.getItem("dep-ano"); if (s && DADOS[s]) ano = s; } catch(e) {}
+
+function botoes(){
+  const box = document.getElementById("anos"); box.innerHTML = "";
+  for (const a of ["2026","2022"]) {
+    const b = document.createElement("button"); b.textContent = a;
+    b.setAttribute("aria-pressed", a === ano);
+    b.onclick = () => { ano = a; try { localStorage.setItem("dep-ano", a); } catch(e) {} render(); };
+    box.appendChild(b);
+  }
+  document.getElementById("nota-ano").textContent = ano === "2026"
+    ? "1º turno de 04/10/2026 — resultado recém-divulgado" : "eleição de 02/10/2022, com retotalização pós-STF";
+}
+
+function kpis(D){
+  const sep = D.base_federacoes.pt + D.base_federacoes.psol, fus = D.cenario_fusao, d = fus - sep;
+  const ufs = D.ufs.filter(u => u.cad_fusao !== u.cad_pt + u.cad_psol).length;
+  const eq = D.sensibilidade.filter(s => s.cadeiras >= sep).map(s => s.retencao);
+  const perdaMax = 100 - Math.min(...eq);
+  const lim = D.lista_limitada;
+  const cards = [
+    ["Cadeiras da federação unificada", fus, `<span class="${d>0?'up':'down'}">${sinal(d)}</span> vs. ${sep} somando as duas (${D.base_federacoes.pt} + ${D.base_federacoes.psol})`],
+    ["UFs em que o saldo muda", ufs, `${D.entram.length} deputados trocados no total, de ${D.total_vagas}`],
+    ["Perda de votos que o ganho aguenta", `${perdaMax}%`, `com mais que isso, a lista unificada elege menos que as duas separadas`],
+    ["Com a lista limitada a vagas + 1", lim.cadeiras, `cortando os nomes menos votados (${(100*lim.votos_cortados/lim.votos_fusao).toLocaleString("pt-BR",{maximumFractionDigits:1})}% dos votos somados)`],
+  ];
+  document.getElementById("kpis").innerHTML = cards.map(([l,v,dt]) =>
+    `<div class="card kpi"><div class="lab">${l}</div><div class="val">${v}</div><div class="det">${dt}</div></div>`).join("");
+}
+
+// ---------- hemiciclo ----------
+function assentos(n){
+  const linhas = 11, r0 = 0.42, pos = [];
+  const raios = Array.from({length: linhas}, (_, i) => r0 + (1 - r0) * i / (linhas - 1));
+  const somaR = raios.reduce((a, b) => a + b, 0);
+  let cont = raios.map(r => Math.round(n * r / somaR));
+  let dif = n - cont.reduce((a, b) => a + b, 0); cont[linhas - 1] += dif;
+  raios.forEach((r, i) => { const k = cont[i];
+    for (let j = 0; j < k; j++) { const t = Math.PI * (1 - j / (k - 1));
+      pos.push({x: r * Math.cos(t), y: r * Math.sin(t), t}); } });
+  pos.sort((a, b) => b.t - a.t || a.x - b.x);
+  return pos;
+}
+function sequencia(contagem, marcados){
+  // ordem: PSOL·Rede → PT·PCdoB·PV → demais; dentro do grupo, cadeiras trocadas na borda
+  const ordemG = ["psol","pt","outros"], seq = [];
+  for (const g of ordemG) {
+    const partes = Object.entries(contagem).filter(([p]) => grupo(p) === g).sort((a, b) => b[1] - a[1]);
+    const normais = [], trocados = [];
+    for (const [p, n] of partes) { const m = marcados[p] || 0;
+      for (let i = 0; i < n - m; i++) normais.push({p, troca: false});
+      for (let i = 0; i < m; i++) trocados.push({p, troca: true}); }
+    if (g === "outros") seq.push(...trocados, ...normais); else seq.push(...normais, ...trocados);
+  }
+  return seq;
+}
+function hemiciclo(id, contagem, marcados, rotuloTroca){
+  const box = document.getElementById(id); box.innerHTML = "";
+  const n = Object.values(contagem).reduce((a, b) => a + b, 0);
+  const W = 520, H = 272, R = 252, cx = W / 2, cy = H - 8;
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `Hemiciclo com ${n} cadeiras`}, box);
+  const pos = assentos(n), seq = sequencia(contagem, marcados);
+  pos.forEach((p, i) => { const s = seq[i], g = grupo(s.p);
+    const c = el("circle", {cx: cx + p.x * R, cy: cy - p.y * R, r: s.troca ? 3.6 : 4.6,
+      fill: s.troca ? "var(--surface)" : cor(g),
+      stroke: s.troca ? (g === "outros" ? "var(--ink2)" : cor(g)) : "none",
+      "stroke-width": s.troca ? 2.2 : 0}, svg);
+    c.addEventListener("mousemove", ev => showTip(`<b>${s.p}</b> · ${contagem[s.p]} cadeiras` +
+      (s.troca ? `<br>${rotuloTroca}` : ""), ev));
+    c.addEventListener("mouseleave", hideTip);
+  });
+  const tot = (g) => Object.entries(contagem).filter(([p]) => grupo(p) === g).reduce((a, [, v]) => a + v, 0);
+  const t = el("text", {x: cx, y: cy - 4, "text-anchor": "middle", "font-size": 34, "font-weight": 650,
+    fill: "var(--ink)"}, svg); t.textContent = tot("pt") + tot("psol");
+  const t2 = document.createElement("div"); t2.className = "hemi-tot";
+  t2.textContent = `PT·PCdoB·PV ${tot("pt")} · PSOL·Rede ${tot("psol")} · demais ${n - tot("pt") - tot("psol")}`;
+  box.appendChild(t2);
+}
+
+// ---------- saldo por partido ----------
+function saldo(D){
+  const box = document.getElementById("saldo"); box.innerHTML = "";
+  const rows = D.partidos.map(p => ({...p, d: p.cenario - p.base})).filter(p => p.d !== 0)
+    .sort((a, b) => b.d - a.d || a.partido.localeCompare(b.partido));
+  const max = Math.max(...rows.map(r => Math.abs(r.d)));
+  const W = 520, rowH = 30, L = 110, H = rows.length * rowH + 26, mid = L + (W - L) / 2, esc = (W - L) / 2 / max - 6;
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Saldo de cadeiras por partido"}, box);
+  el("line", {x1: mid, x2: mid, y1: 4, y2: H - 18, stroke: "var(--axis)", "stroke-width": 1}, svg);
+  rows.forEach((r, i) => { const y = 8 + i * rowH, w = Math.abs(r.d) * esc, g = grupo(r.partido);
+    const lb = el("text", {x: L - 10, y: y + 15, "text-anchor": "end", "font-size": 13, fill: "var(--ink)"}, svg);
+    lb.textContent = r.partido;
+    const x = r.d > 0 ? mid + 1 : mid - 1 - w;
+    el("rect", {x, y: y + 4, width: w, height: 16, rx: 4, fill: cor(g)}, svg);
+    const v = el("text", {x: r.d > 0 ? x + w + 6 : x - 6, y: y + 16.5, "text-anchor": r.d > 0 ? "start" : "end",
+      "font-size": 12.5, fill: "var(--ink2)"}, svg); v.textContent = sinal(r.d);
+    const hit = el("rect", {x: 0, y, width: W, height: rowH, fill: "transparent"}, svg);
+    hit.addEventListener("mousemove", ev => showTip(`<b>${r.partido}</b><br>real ${r.base} → cenário ${r.cenario} (${sinal(r.d)})`, ev));
+    hit.addEventListener("mouseleave", hideTip);
+  });
+  const a = el("text", {x: mid - 8, y: H - 2, "text-anchor": "end", "font-size": 11.5, fill: "var(--muted)"}, svg); a.textContent = "← perde";
+  const b = el("text", {x: mid + 8, y: H - 2, "font-size": 11.5, fill: "var(--muted)"}, svg); b.textContent = "ganha →";
+
+  document.getElementById("tab-partidos").innerHTML = `<table><thead><tr><th>Partido</th><th class="n">Real</th><th class="n">Cenário</th><th class="n">Saldo</th></tr></thead><tbody>` +
+    D.partidos.map(p => `<tr><td><span class="pill" style="background:${cor(grupo(p.partido))}"></span>${p.partido}</td><td class="n">${p.base}</td><td class="n">${p.cenario}</td><td class="n">${sinal(p.cenario - p.base)}</td></tr>`).join("") + `</tbody></table>`;
+}
+
+// ---------- sensibilidade ----------
+function sens(D){
+  const box = document.getElementById("sens"); box.innerHTML = "";
+  const S = [...D.sensibilidade].sort((a, b) => a.retencao - b.retencao);
+  const sep = D.base_federacoes.pt + D.base_federacoes.psol;
+  const W = 520, H = 280, m = {l: 40, r: 16, t: 14, b: 34};
+  const ys = S.map(s => s.cadeiras).concat(sep);
+  const y0 = Math.floor((Math.min(...ys) - 2) / 5) * 5, y1 = Math.ceil((Math.max(...ys) + 2) / 5) * 5;
+  const X = v => m.l + (v - 80) / 20 * (W - m.l - m.r), Y = v => H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b);
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Cadeiras por retenção de votos"}, box);
+  for (let v = y0; v <= y1; v += 5) { el("line", {x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: "var(--grid)"}, svg);
+    const t = el("text", {x: m.l - 6, y: Y(v) + 4, "text-anchor": "end", "font-size": 11.5, fill: "var(--muted)"}, svg); t.textContent = v; }
+  for (let v = 80; v <= 100; v += 5) { const t = el("text", {x: X(v), y: H - m.b + 18, "text-anchor": "middle", "font-size": 11.5, fill: "var(--muted)"}, svg); t.textContent = v + "%"; }
+  const tx = el("text", {x: (m.l + W - m.r) / 2, y: H - 2, "text-anchor": "middle", "font-size": 11.5, fill: "var(--muted)"}, svg);
+  tx.textContent = "votos retidos pela lista unificada";
+  el("line", {x1: m.l, x2: W - m.r, y1: Y(sep), y2: Y(sep), stroke: "var(--ink2)", "stroke-width": 1}, svg);
+  const rl = el("text", {x: m.l + 6, y: Y(sep) - 6, "font-size": 12, fill: "var(--ink2)"}, svg);
+  rl.textContent = `separadas: ${sep}`;
+  let d = ""; S.forEach((s, i) => { d += (i ? "H" + X(s.retencao) + "V" : "M" + X(s.retencao) + ",") + Y(s.cadeiras); });
+  el("path", {d, fill: "none", stroke: "var(--pt)", "stroke-width": 2, "stroke-linejoin": "round"}, svg);
+  const ult = S[S.length - 1];
+  const lab = el("text", {x: X(100) - 4, y: Y(ult.cadeiras) - 8, "text-anchor": "end", "font-size": 12, "font-weight": 600, fill: "var(--ink)"}, svg);
+  lab.textContent = `${ult.cadeiras} com 100%`;
+  const cross = el("line", {y1: m.t, y2: H - m.b, stroke: "var(--axis)", opacity: 0}, svg);
+  const dot = el("circle", {r: 5, fill: "var(--pt)", stroke: "var(--surface)", "stroke-width": 2, opacity: 0}, svg);
+  const hit = el("rect", {x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent"}, svg);
+  hit.addEventListener("mousemove", ev => {
+    const b = svg.getBoundingClientRect(), vx = (ev.clientX - b.left) / b.width * W;
+    const r = Math.max(80, Math.min(100, Math.round(80 + (vx - m.l) / (W - m.l - m.r) * 20)));
+    const s = S.find(q => q.retencao === r);
+    cross.setAttribute("x1", X(r)); cross.setAttribute("x2", X(r)); cross.setAttribute("opacity", 1);
+    dot.setAttribute("cx", X(r)); dot.setAttribute("cy", Y(s.cadeiras)); dot.setAttribute("opacity", 1);
+    showTip(`Retendo <b>${r}%</b> dos votos: <b>${s.cadeiras}</b> cadeiras<br>${sinal(s.cadeiras - sep)} vs. separadas`, ev);
+  });
+  hit.addEventListener("mouseleave", () => { cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); hideTip(); });
+  const eq = Math.min(...S.filter(s => s.cadeiras >= sep).map(s => s.retencao));
+  document.getElementById("sens-nota").textContent =
+    `A perda é aplicada por igual a todos os votos da lista unificada e sai do total de válidos. ` +
+    `O ganho se mantém até ${eq}% de retenção (perda de ${100 - eq}%).`;
+}
+
+// ---------- tabelas ----------
+function tabUfs(D){
+  const rows = [...D.ufs].sort((a, b) => {
+    const da = a.cad_fusao - a.cad_pt - a.cad_psol, db = b.cad_fusao - b.cad_pt - b.cad_psol;
+    const ca = Object.keys(a.delta_partido).length > 0, cb = Object.keys(b.delta_partido).length > 0;
+    return db - da || cb - ca || a.uf.localeCompare(b.uf); });
+  const q = (v, qe) => (v / qe).toLocaleString("pt-BR", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const perde = u => Object.entries(u.delta_partido).filter(([p, d]) => grupo(p) === "outros" && d < 0)
+    .map(([p, d]) => `${p} ${sinal(d)}`).join(", ");
+  const interno = u => Object.entries(u.delta_partido).filter(([p]) => grupo(p) !== "outros")
+    .map(([p, d]) => `${p} ${sinal(d)}`).join(", ");
+  document.getElementById("tab-ufs").innerHTML = `<table><thead><tr>
+    <th>UF</th><th class="n">Vagas</th><th class="n">QE</th><th class="n">FE Brasil<br>(× QE)</th><th class="n">PSOL/Rede<br>(× QE)</th>
+    <th class="n">Cadeiras<br>separadas</th><th class="n">Unificada</th><th class="n">Saldo</th><th>Dentro da lista</th><th>Quem perde</th><th>Por quê</th></tr></thead><tbody>` +
+    rows.map(u => { const sep = u.cad_pt + u.cad_psol, d = u.cad_fusao - sep, chg = Object.keys(u.delta_partido).length > 0;
+      return `<tr class="${chg ? "chg" : ""}"><td><b>${u.uf}</b></td><td class="n">${u.vagas}</td><td class="n">${fmt(u.qe)}</td>
+      <td class="n">${q(u.votos_pt, u.qe)}</td><td class="n">${q(u.votos_psol, u.qe)}${u.psol_80 ? "" : '<span class="tag">&lt;80%</span>'}</td>
+      <td class="n">${u.cad_pt} + ${u.cad_psol}</td><td class="n">${u.cad_fusao}</td>
+      <td class="n ${d > 0 ? "up" : d < 0 ? "down" : ""}">${d ? sinal(d) : "–"}</td>
+      <td>${interno(u)}</td><td>${perde(u)}</td><td style="min-width:220px;color:var(--ink2)">${u.mecanismo}</td></tr>`; }).join("") + `</tbody></table>`;
+}
+function tabCand(id, lista){
+  document.getElementById(id).innerHTML = lista.length ? `<table><thead><tr><th>UF</th><th>Candidato</th><th>Partido</th><th class="n">Votos</th></tr></thead><tbody>` +
+    lista.map(c => `<tr><td>${c.uf}</td><td>${c.nome}</td><td><span class="pill" style="background:${cor(grupo(c.partido))}"></span>${c.partido}</td><td class="n">${fmt(c.votos)}</td></tr>`).join("") +
+    `</tbody></table>` : `<p class="note">Nenhum.</p>`;
+}
+
+function render(){
+  const D = DADOS[ano]; botoes(); kpis(D);
+  const base = {}, cen = {}, sai = {}, ent = {};
+  D.partidos.forEach(p => { if (p.base) base[p.partido] = p.base; if (p.cenario) cen[p.partido] = p.cenario; });
+  D.saem.forEach(c => sai[c.partido] = (sai[c.partido] || 0) + 1);
+  D.entram.forEach(c => ent[c.partido] = (ent[c.partido] || 0) + 1);
+  hemiciclo("hemi-a", base, sai, "Este grupo perde uma cadeira no cenário");
+  hemiciclo("hemi-b", cen, ent, "Cadeira conquistada no cenário");
+  document.getElementById("hemi-a-sub").textContent = `${D.total_vagas} cadeiras · resultado oficial`;
+  document.getElementById("hemi-b-sub").textContent = `${D.total_vagas} cadeiras · mesmos votos, listas somadas`;
+  saldo(D); sens(D); tabUfs(D); tabCand("entram", D.entram); tabCand("saem", D.saem);
+}
+render();
+</script>
+</body>
+</html>
