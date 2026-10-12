@@ -79,6 +79,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .scroll.tall{max-height:460px;overflow-y:auto}
 .pill{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
 .vazio{color:var(--ink2);padding:6px 0}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.cl-det{color:var(--muted);font-size:12.5px;margin-top:2px}
+.cl-resumo{margin:10px 0 12px;color:var(--ink2);font-size:14px}
+.cl-resumo b{color:var(--ink)}
 #tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);
   border-radius:8px;padding:7px 10px;font-size:12.5px;box-shadow:0 4px 18px rgba(0,0,0,.12);opacity:0;transition:opacity .08s;z-index:9;max-width:260px}
 details summary{cursor:pointer;color:var(--ink2);font-size:13.5px;margin-top:8px}
@@ -95,8 +99,8 @@ details summary{cursor:pointer;color:var(--ink2);font-size:13.5px;margin-top:8px
   <h1>Simulador de federações na Câmara</h1>
   <p class="sub">Junte quaisquer listas da eleição para deputado federal numa federação e veja quantas cadeiras
     cada partido teria. Os votos são os oficiais do TSE; o motor de cálculo reproduz exatamente os 513 eleitos
-    reais quando nenhuma federação nova é formada.
-    <a href="dashboard.html" style="color:var(--ink)">Análise detalhada de PT + PSOL/Rede →</a></p>
+    reais quando nenhuma federação nova é formada. Use o atalho “PT + PSOL/Rede” para ver as duas federações
+    de esquerda numa lista só.</p>
 
   <div class="filters">
     <span class="note">Eleição:</span><div class="seg" id="anos"></div>
@@ -122,6 +126,12 @@ details summary{cursor:pointer;color:var(--ink2);font-size:13.5px;margin-top:8px
   <div class="card"><h2>Federações formadas</h2>
     <div class="note">Cadeiras da lista única vs. soma das cadeiras que as mesmas listas tiveram separadas</div>
     <div class="feds" id="feds" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card"><h2>Cláusula de barreira</h2>
+    <div class="note" id="cl-regra"></div>
+    <div class="cl-resumo" id="cl-resumo"></div>
+    <div class="scroll tall" id="tab-clausula"></div>
   </div>
 
   <div class="grid two">
@@ -163,11 +173,20 @@ details summary{cursor:pointer;color:var(--ink2);font-size:13.5px;margin-top:8px
       <li>Quociente eleitoral (QE) = votos válidos ÷ vagas, fração ≤ 0,5 desprezada; quociente partidário = votos da lista ÷ QE, com candidatos de pelo menos 10% do QE.</li>
       <li>Sobras por maiores médias entre listas com ≥ 80% do QE e candidato com ≥ 20% do QE; esgotadas, a última fase é aberta a todas (STF, ADIs 7228, 7263 e 7325).</li>
     </ul>
+    <h3>Cláusula de barreira (CF art. 17 §3º, EC 97/2017)</h3>
+    <ul>
+      <li>Só tem fundo partidário e tempo de rádio e TV o partido que, na eleição para a Câmara, tiver <b>pelo menos X% dos votos válidos do país,
+        com no mínimo Y% em pelo menos 9 UFs</b>, ou <b>pelo menos N deputados eleitos em pelo menos 9 UFs</b>.
+        Em 2022: 2%, 1% e 11 deputados. Em 2026: 2,5%, 1,5% e 13 deputados.</li>
+      <li>A federação conta como um único partido (Lei 14.208/2021): o desempenho é o da lista inteira, e todos os partidos dela passam juntos.
+        Na simulação, a federação nova é avaliada com os votos e as cadeiras simulados (com a retenção e o teto escolhidos).</li>
+      <li>Em 2022, o cálculo barra exatamente os 15 partidos que o TSE barrou.</li>
+    </ul>
     <h3>Dados e validação</h3>
     <ul>
       <li>2026: arquivos de divulgação do TSE de 04/10/2026, ainda sujeitos a retotalização. 2022: Portal de Dados Abertos do TSE (com a correção dos valores dobrados do arquivo por partido).</li>
       <li>O cálculo roda no navegador e é um porte do motor em Python (<code>alocacao.py</code>). <code>teste_simulador.html</code> confere que os dois elegem exatamente as mesmas pessoas em 13 cenários por ano, incluindo a eleição real (513 de 513) e o cenário PT + PSOL/Rede do painel anterior.</li>
-      <li>O exercício olha só a Câmara: não modela candidaturas que deixariam de existir, alianças estaduais, cláusula de barreira, fundo partidário ou tempo de TV.</li>
+      <li>O exercício olha só a Câmara: não modela candidaturas que deixariam de existir, alianças estaduais, fundo partidário ou tempo de TV.</li>
     </ul>
   </div>
 </div>
@@ -278,13 +297,36 @@ function preparaAno(D) {
   return out;
 }
 
-// {UF: {qe, eleitos, cad, agrs}} para um cenário
+// {UF: {qe, eleitos, cad, agrs, vv}} para um cenário
 function simula(ano, grupos, fator = 1, limitar = false) {
   const out = {};
   for (const [uf, s] of Object.entries(ano)) {
     const {agrs, perdidos} = federar(s.agrs, grupos, fator, limitar ? s.vagas + 1 : null);
-    out[uf] = {...distribuir(agrs, s.vagas, s.vv - perdidos), agrs};
+    out[uf] = {...distribuir(agrs, s.vagas, s.vv - perdidos), agrs, vv: s.vv - perdidos};
   }
+  return out;
+}
+
+// Cláusula de barreira — porte de clausula.clausula. Percentuais em milésimos.
+const BARREIRA = {2022: {nac: 20, uf: 10, dep: 11}, 2026: {nac: 25, uf: 15, dep: 13}}, MIN_UFS = 9;
+
+// {id da agremiação: {votos, ufsVotos, dep, ufsDep, passa: "votos" | "deputados" | null}}
+function clausula(ano, res) {
+  const r = BARREIRA[ano], out = {};
+  let total = 0;
+  for (const u of Object.values(res)) {
+    total += u.vv;
+    u.agrs.forEach((a, k) => {
+      const d = out[a.id] || (out[a.id] = {votos: 0, ufsVotos: 0, dep: 0, ufsDep: 0});
+      d.votos += a.votos;
+      if (a.votos * 1000 >= r.uf * u.vv) d.ufsVotos++;
+      d.dep += u.cad[k];
+      if (u.cad[k] > 0) d.ufsDep++;
+    });
+  }
+  for (const d of Object.values(out))
+    d.passa = d.votos * 1000 >= r.nac * total && d.ufsVotos >= MIN_UFS ? "votos"
+      : d.dep >= r.dep && d.ufsDep >= MIN_UFS ? "deputados" : null;
   return out;
 }
 </script>
@@ -306,8 +348,11 @@ function showTip(html, ev){ tip.innerHTML = html; tip.style.opacity = 1;
   tip.style.left = x + "px"; tip.style.top = (ev.clientY + 14) + "px"; }
 function hideTip(){ tip.style.opacity = 0; }
 
-const PREP = {};
+const PREP = {}, CL_REAL = {};
 const prep = a => PREP[a] || (PREP[a] = preparaAno(DADOS[a]));
+const somaVv = res => Object.values(res).reduce((s, u) => s + u.vv, 0);
+// cláusula de barreira da eleição real: {cl, total}
+const clReal = a => CL_REAL[a] || (CL_REAL[a] = (r => ({cl: clausula(a, r), total: somaVv(r)}))(simula(prep(a), [])));
 
 let est = {ano: "2026", grupos: {"2026": {...ESQ}, "2022": {...ESQ}}, fator: 100, limitar: false};
 try { const s = JSON.parse(localStorage.getItem("dep-sim")); if (s && DADOS[s.ano]) est = s; } catch (e) {}
@@ -346,7 +391,10 @@ function calcula(){
     });
     if (Object.values(dPar).some(v => v)) ufs.push({uf, vagas: s.vagas, qe: res[uf].qe, porFed, dPar});
   }
-  return {D, A, membros, ativos, grupoLista, grupoPartido, real, sim, entram, saem, ufs, fed};
+  // cláusula: cada lista é avaliada sozinha ou pela federação em que entrou
+  const idSim = l => grupoLista[l] >= 0 ? membros[grupoLista[l]].join(" + ") : l;
+  const barreira = {real: clReal(est.ano), sim: {cl: clausula(est.ano, res), total: somaVv(res)}, idSim};
+  return {D, A, membros, ativos, grupoLista, grupoPartido, real, sim, entram, saem, ufs, fed, barreira};
 }
 
 // ---------- controles ----------
@@ -373,7 +421,7 @@ function listas(R){
     const g = R.grupoLista[l.id];
     const membrosTxt = l.partidos.length > 1 ? l.partidos.join(" · ") : "";
     row.innerHTML = `<span class="dot" style="background:${corG(g)}"></span>
-      <div><div class="nm">${esc(l.id)}</div><div class="mt">${membrosTxt ? esc(membrosTxt) + " · " : ""}${pct(l.votos / tot)} dos votos · ${l.cadeiras} cadeiras</div></div>`;
+      <div><div class="nm">${esc(l.id)}</div><div class="mt">${membrosTxt ? esc(membrosTxt) + " · " : ""}${pct(l.votos / tot)} dos votos · ${l.cadeiras} cadeiras${R.barreira.real.cl[l.id].passa ? "" : ` · <span class="down">barrada</span>`}</div></div>`;
     const sel = document.createElement("select"); sel.setAttribute("aria-label", `Federação de ${l.id}`);
     sel.innerHTML = `<option value="">Sozinha</option>` + LETRAS.map((L, i) => `<option value="${i}">Federação ${L}</option>`).join("");
     sel.value = m[l.id] !== undefined ? m[l.id] : "";
@@ -412,8 +460,41 @@ function feds(R){
       <div class="det">${f.membros.map(esc).join(" + ")}</div>
       <div class="big">${f.junto} <span class="${d > 0 ? "up" : d < 0 ? "down" : ""}" style="font-size:18px">${d ? sinal(d) : "±0"}</span></div>
       <div class="det">${f.sep} separadas · muda em ${f.ufs} UF${f.ufs === 1 ? "" : "s"}</div>
+      <div class="det" style="margin-top:4px">Cláusula de barreira: ${selo(R.barreira.sim.cl[f.membros.join(" + ")])}</div>
       <div class="det" style="margin-top:4px">${parts}</div></div>`; }).join("") +
     (soltas.length ? `<div class="vazio note">Federação ${soltas.map(x => x.L).join(", ")}: só uma lista, ignorada.</div>` : "");
+}
+
+// ---------- cláusula de barreira ----------
+const milesimo = x => (x / 10).toLocaleString("pt-BR") + "%";
+const selo = d => d.passa ? `<span style="white-space:nowrap"><span class="tag up">✓ passa</span> <span class="note">por ${d.passa}</span></span>`
+                          : `<span class="tag down">✗ barrada</span>`;
+const detCl = (d, total) => `${pct(d.votos / total)} dos votos · ${d.ufsVotos} UFs ≥ ${milesimo(BARREIRA[est.ano].uf)} · ` +
+  `${d.dep} dep. em ${d.ufsDep} UF${d.ufsDep === 1 ? "" : "s"}`;
+function clausulaCard(R){
+  const r = BARREIRA[est.ano], {real, sim, idSim} = R.barreira;
+  document.getElementById("cl-regra").textContent = `Em ${est.ano}, passa a lista com pelo menos ${milesimo(r.nac)} dos votos válidos do país ` +
+    `e ${milesimo(r.uf)} em ${MIN_UFS} UFs, ou com ${r.dep} deputados eleitos em ${MIN_UFS} UFs. Federação conta como um partido só.`;
+  const linhas = R.D.listas.map(l => ({l, a: real.cl[l.id], b: sim.cl[idSim(l.id)], g: R.grupoLista[l.id]}));
+  const nPart = f => linhas.filter(f).reduce((s, x) => s + x.l.partidos.length, 0);
+  const salvas = linhas.filter(x => !x.a.passa && x.b.passa), caem = linhas.filter(x => x.a.passa && !x.b.passa);
+  const nomes = xs => xs.map(x => `${esc(x.l.id)}${x.g >= 0 ? ` (Fed. ${LETRAS[x.g]})` : ""}`).join(", ");
+  const nReal = nPart(x => !x.a.passa), nSim = nPart(x => !x.b.passa);
+  const barradas = linhas.filter(x => !x.b.passa).map(x => esc(x.l.id)).join(", ");
+  document.getElementById("cl-resumo").innerHTML = `Partidos barrados: <b>${nReal}</b> na eleição real` +
+    (R.ativos.length ? ` → <b>${nSim}</b> na simulação.` : ".") +
+    (barradas ? `<br><span class="down">Barradas${R.ativos.length ? " na simulação" : ""}:</span> ${barradas}.` : "") +
+    (salvas.length ? `<br><span class="up">Passam graças à federação:</span> ${nomes(salvas)}.` : "") +
+    (caem.length ? `<br><span class="down">Passam a ser barradas:</span> ${nomes(caem)}.` : "");
+  document.getElementById("tab-clausula").innerHTML = `<table><thead><tr><th>Lista</th><th>Eleição real</th><th>Simulação</th></tr></thead><tbody>` +
+    linhas.map(({l, a, b, g}) => {
+      const muda = !a.passa && b.passa ? ` <span class="tag up">salva</span>` : a.passa && !b.passa ? ` <span class="tag down">cai</span>` : "";
+      const via = g >= 0 ? `<div class="cl-det"><span class="pill" style="background:${corG(g)}"></span>pela Federação ${LETRAS[g]}</div>` : "";
+      return `<tr><td><span class="pill" style="background:${corG(g)}"></span><b>${esc(l.id)}</b>` +
+        (l.partidos.length > 1 ? `<div class="cl-det">${l.partidos.map(esc).join(" · ")}</div>` : "") + `</td>` +
+        `<td>${selo(a)}<div class="cl-det">${detCl(a, real.total)}</div></td>` +
+        `<td>${selo(b)}${muda}${via}<div class="cl-det">${detCl(b, sim.total)}</div></td></tr>`;
+    }).join("") + `</tbody></table>`;
 }
 
 // ---------- hemiciclo ----------
@@ -519,7 +600,7 @@ function tabCand(id, R, lista){
 
 function render(){
   const R = calcula();
-  controles(); listas(R); kpis(R); feds(R); legenda(R);
+  controles(); listas(R); kpis(R); feds(R); clausulaCard(R); legenda(R);
   const sai = {}, ent = {};
   R.saem.forEach(c => sai[c.partido] = (sai[c.partido] || 0) + 1);
   R.entram.forEach(c => ent[c.partido] = (ent[c.partido] || 0) + 1);
